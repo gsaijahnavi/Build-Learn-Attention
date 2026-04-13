@@ -1,51 +1,68 @@
 # Build & Learn
 
-A 10-week series where I pick one ML concept, learn it properly, build something from it, and write about what made it click.
-
-Each week has:
-- A clean Python implementation from scratch
-- Inline comments explaining every step
-- A link to the Substack post with the full breakdown
+Learning ML concepts by building them from scratch. No shortcuts, no libraries doing the heavy lifting — just code and understanding.
 
 ---
 
-## Series
+## Week 1: Self-Attention & Transformer Encoder
 
-| Week | Concept | Code | Post |
-|------|---------|------|------|
-| 1 | Self-Attention & Transformer Encoder | [week1_self_attention.py](./week1_self_attention.py) | Coming soon |
-| 2 | LoRA — Fine-tuning without the compute bill | Coming soon | Coming soon |
-| 3 | BERT — Why bidirectional context changed everything | Coming soon | Coming soon |
-| 4 | RAG — Giving your LLM a memory it can trust | Coming soon | Coming soon |
-| 5 | InstructGPT & RLHF — How models learned to follow instructions | Coming soon | Coming soon |
-| 6 | Mamba — Can we replace the transformer? | Coming soon | Coming soon |
-| 7 | Constitutional AI — Anthropic's approach to alignment | Coming soon | Coming soon |
-| 8 | Chinchilla scaling laws — How big should your model actually be? | Coming soon | Coming soon |
-| 9 | FlashAttention — Making transformers fast enough to use | Coming soon | Coming soon |
-| 10 | LLM Evaluation — How do you know if your model is any good? | Coming soon | Coming soon |
+### What is self-attention?
 
----
+Every token in a sequence looks at every other token simultaneously and decides what's relevant.
 
-## Setup
+Before transformers, models like RNNs read sequences word by word — left to right. By word 40, context from word 3 was mostly gone. Self-attention fixes this by letting every token attend to every other token in one shot, in parallel.
 
-```bash
-git clone https://github.com/YOUR_USERNAME/build-and-learn.git
-cd build-and-learn
-pip install -r requirements.txt
+Three vectors drive it:
+
+- **Q (Query)** — what am I looking for?
+- **K (Key)** — what do I offer?
+- **V (Value)** — what do I actually pass forward?
+
+The attention score:
+
+```
+Attention(Q, K, V) = softmax(QKᵀ / √d_k) × V
 ```
 
-Run week 1:
+Run multiple attention heads in parallel and each one picks up a different kind of relationship — grammar, meaning, coreference. Stack a few encoder blocks and you have a transformer encoder.
+
+---
+
+### What this builds
+
+A transformer encoder from scratch in PyTorch:
+
+- `SelfAttention` — multi-head attention, step by step
+- `PositionalEncoding` — sine/cosine encoding so the model knows word order
+- `FeedForward` — the MLP that follows attention in each block
+- `EncoderBlock` — attention + feed-forward + residual connections + layer norm
+- `TransformerEncoder` — full encoder with N stacked blocks
+
+---
+
+### Run it
 
 ```bash
+pip install -r requirements.txt
 python week1_self_attention.py
 ```
 
+Expected output:
+
+```
+Input shape:  torch.Size([2, 10])
+Output shape: torch.Size([2, 10, 64])
+Total parameters: 164,096
+
+Forward pass successful.
+Each token now carries context from every other token in the sequence.
+```
+
+Input is a batch of 2 sequences, each 10 tokens long.
+Output is the same shape but each token now carries context from the entire sequence.
+
 ---
 
-## About
+### Read the full breakdown
 
-I'm Sai Jahnavi — Senior Data Scientist at a healthcare AI startup. I work on readmission risk models, LLM cost optimization, and AI infrastructure.
-
-This repo is me learning in public. Every implementation is from scratch — no shortcuts — because that's the only way I actually understand something.
-
-Follow along on Substack: [dsunpacked.substack.com](https://dsunpacked.substack.com)
+[dsunpacked.substack.com](https://dsunpacked.substack.com)
