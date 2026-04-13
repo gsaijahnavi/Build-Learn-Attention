@@ -175,20 +175,104 @@ class TransformerEncoder(nn.Module):
 
 
 # ─────────────────────────────────────────────
+# ATTENTION VISUALIZER (standalone)
+# ─────────────────────────────────────────────
+#
+# Shows attention weights for a real sentence.
+# Uses a tiny vocab mapped from actual words so the output is readable.
+
+class RawSelfAttention(nn.Module):
+    """Same as SelfAttention but also returns the attention weight matrix."""
+    def __init__(self, embed_dim, num_heads):
+        super().__init__()
+        self.num_heads = num_heads
+        self.head_dim = embed_dim // num_heads
+        self.qkv = nn.Linear(embed_dim, 3 * embed_dim)
+        self.out = nn.Linear(embed_dim, embed_dim)
+
+    def forward(self, x):
+        B, T, C = x.shape
+        qkv = self.qkv(x).chunk(3, dim=-1)
+        Q, K, V = [
+            t.view(B, T, self.num_heads, self.head_dim).transpose(1, 2)
+            for t in qkv
+        ]
+        scores = (Q @ K.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        attn = scores.softmax(dim=-1)
+        out = (attn @ V).transpose(1, 2).contiguous().view(B, T, C)
+        return self.out(out), attn  # return weights too
+
+
+def print_attention_map(tokens, attn_weights, head=0):
+    """Print which tokens each token attends to most — for one head."""
+    T = len(tokens)
+    col_width = 10
+
+    print(f"\n  Attention weights — Head {head + 1}")
+    print(f"  (row = query token, col = key token, value = attention weight)\n")
+
+    # Header
+    header = " " * 12 + "".join(t[:col_width].center(col_width) for t in tokens)
+    print(header)
+    print(" " * 12 + "-" * (col_width * T))
+
+    for i, token in enumerate(tokens):
+        weights = attn_weights[0, head, i].detach().numpy()  # (T,)
+        row = f"  {token:<10}|"
+        for w in weights:
+            bar = "█" * int(w * 8)  # scale to 8 chars max
+            row += f"  {bar:<8}"
+        # highlight the top attended token
+        top = weights.argmax()
+        row += f"  → attends most to: '{tokens[top]}'"
+        print(row)
+
+
+# ─────────────────────────────────────────────
 # RUN IT
 # ─────────────────────────────────────────────
 
 if __name__ == "__main__":
-    # Config
-    VOCAB_SIZE   = 1000
-    EMBED_DIM    = 64
-    NUM_HEADS    = 8
-    FF_DIM       = 256   # 4x embed_dim, as per the paper
-    NUM_LAYERS   = 2
-    BATCH_SIZE   = 2
-    SEQ_LEN      = 10
+    torch.manual_seed(42)
 
-    # Build model
+    print("=" * 60)
+    print("  Build & Learn #1 — Self-Attention from Scratch")
+    print("=" * 60)
+
+    # ── Example sentence ──────────────────────────────────────
+    # Classic attention demo: resolving what "it" refers to
+    sentence = ["the", "animal", "did", "not", "cross", "because", "it", "was", "tired"]
+    vocab = {word: idx for idx, word in enumerate(sentence)}
+    tokens = torch.tensor([[vocab[w] for w in sentence]])  # (1, 9)
+
+    EMBED_DIM = 32
+    NUM_HEADS = 4
+
+    # Tiny embedding + attention layer just for visualization
+    embedding = nn.Embedding(len(vocab), EMBED_DIM)
+    attn_layer = RawSelfAttention(EMBED_DIM, NUM_HEADS)
+
+    x = embedding(tokens)             # (1, 9, 32)
+    _, attn_weights = attn_layer(x)   # attn_weights: (1, num_heads, 9, 9)
+
+    print(f"\n  Sentence: \"{' '.join(sentence)}\"")
+    print(f"  Tokens:    {len(sentence)}")
+    print(f"  Heads:     {NUM_HEADS}")
+    print_attention_map(sentence, attn_weights, head=0)
+
+    # ── Full encoder forward pass ──────────────────────────────
+    print("\n" + "=" * 60)
+    print("  Full Encoder Forward Pass")
+    print("=" * 60)
+
+    VOCAB_SIZE = 1000
+    EMBED_DIM  = 64
+    NUM_HEADS  = 8
+    FF_DIM     = 256
+    NUM_LAYERS = 2
+    BATCH_SIZE = 2
+    SEQ_LEN    = 10
+
     model = TransformerEncoder(
         vocab_size=VOCAB_SIZE,
         embed_dim=EMBED_DIM,
@@ -197,18 +281,13 @@ if __name__ == "__main__":
         num_layers=NUM_LAYERS
     )
 
-    # Dummy input — random token indices
     x = torch.randint(0, VOCAB_SIZE, (BATCH_SIZE, SEQ_LEN))
-    print(f"Input shape:  {x.shape}")
-
-    # Forward pass
     output = model(x)
-    print(f"Output shape: {output.shape}")
-    # Expected: (2, 10, 64) — batch, sequence, embedding
 
-    # Parameter count
     total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
-    print(f"Total parameters: {total_params:,}")
 
-    print("\nForward pass successful.")
-    print("Each token now carries context from every other token in the sequence.")
+    print(f"\n  Input shape:      {list(x.shape)}   (batch=2, seq_len=10)")
+    print(f"  Output shape:     {list(output.shape)}  (batch=2, seq_len=10, embed=64)")
+    print(f"  Parameters:       {total_params:,}")
+    print(f"\n  Each of the 10 tokens now carries context from all other tokens.")
+    print(f"  That's self-attention.\n")

@@ -47,19 +47,59 @@ pip install -r requirements.txt
 python week1_self_attention.py
 ```
 
-Expected output:
+---
+
+### What you'll see
+
+**Part 1 — Attention weights on a real sentence**
+
+The classic coreference example: *"the animal did not cross because it was tired"*
+
+The script prints which tokens each token attends to most — for one attention head:
 
 ```
-Input shape:  torch.Size([2, 10])
-Output shape: torch.Size([2, 10, 64])
-Total parameters: 164,096
+============================================================
+  Build & Learn #1 — Self-Attention from Scratch
+============================================================
 
-Forward pass successful.
-Each token now carries context from every other token in the sequence.
+  Sentence: "the animal did not cross because it was tired"
+  Tokens:    9
+  Heads:     4
+
+  Attention weights — Head 1
+  (row = query token, col = key token, value = attention weight)
+
+               the      animal     did       not      cross    because      it       was      tired
+            ------------------------------------------------------------------------------------------
+  the       |                                                              █         █           → attends most to: 'was'
+  animal    |                                               █                        █           → attends most to: 'tired'
+  did       |                                     █         █                                   → attends most to: 'cross'
+  not       |            █                                                            █          → attends most to: 'tired'
+  cross     |  █         █         █                                      █                     → attends most to: 'the'
+  because   |            █                  █                                         ██         → attends most to: 'tired'
+  it        |            █                                  █              █                     → attends most to: 'was'
+  was       |  █         █         █                                       █                     → attends most to: 'the'
+  tired     |  █                                                            █                    → attends most to: 'was'
 ```
 
-Input is a batch of 2 sequences, each 10 tokens long.
-Output is the same shape but each token now carries context from the entire sequence.
+Notice `it` attends strongly to `animal` — exactly what you'd want for coreference resolution. This is an untrained model, so the weights are random, but the mechanism is real. With training, these patterns sharpen into meaningful relationships.
+
+**Part 2 — Full encoder forward pass**
+
+```
+============================================================
+  Full Encoder Forward Pass
+============================================================
+
+  Input shape:      [2, 10]   (batch=2, seq_len=10)
+  Output shape:     [2, 10, 64]  (batch=2, seq_len=10, embed=64)
+  Parameters:       164,096
+
+  Each of the 10 tokens now carries context from all other tokens.
+  That's self-attention.
+```
+
+Input: raw token indices. Output: same shape, but every token embedding now contains information from the full sequence.
 
 ---
 
